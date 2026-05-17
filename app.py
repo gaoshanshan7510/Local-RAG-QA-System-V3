@@ -4,7 +4,8 @@ from rag_core import get_qa_chain
 # ====== 1. 页面基础配置 ======
 st.set_page_config(page_title="自动化机电知识库专家系统", page_icon="✈️", layout="wide")
 st.title("✈️ 自动化与机电设备智能问答系统")
-st.caption("基于本地 Qwen2.5 + LangChain LCEL 架构实现集成多轮历史记忆与 BGE-Rerank 重排高精度检索。")
+# 副标题加入“混合检索”的描述
+st.caption("基于本地 Qwen2.5 + LangChain LCEL 架构，实现 Chroma+BM25 双路混合检索、BGE-Rerank 精准重排与多轮历史记忆的高精度 RAG 系统。")
 
 # ====== 2. 初始化大模型问答链 ======
 @st.cache_resource
@@ -20,8 +21,10 @@ if "messages" not in st.session_state:
 # ====== 4. 侧边栏：控制面板 ======
 with st.sidebar:
     st.header("⚙️ 控制面板")
-    st.success("✅ Rerank 重排引擎已激活")
-    st.success("✅ 历史记忆功能已就绪")
+    # 在侧边栏增加 BM25 混合检索状态灯
+    st.success("✅ BM25+Chroma 双路混合检索已激活")
+    st.success("✅ BGE-Rerank 重排引擎已激活")
+    st.success("✅ 多轮历史记忆功能已就绪")
     
     st.divider()
     if st.button("🧹 清空对话记忆", use_container_width=True):
@@ -34,7 +37,8 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
         # 如果历史记录里保存了参考来源，一并渲染出来
         if "sources" in message and message["sources"]:
-            with st.expander("📚 查看参考来源 (Top-3 重排结果)"):
+            # 修改折叠面板标题，体现双路召回
+            with st.expander("📚 查看参考来源 (双路召回 + Top-3 精排结果)"):
                 for i, doc in enumerate(message["sources"]):
                     # 获取文档信息和重排打分
                     source_name = doc.metadata.get("source", "未知文档")
@@ -68,8 +72,8 @@ if prompt := st.chat_input("请输入您关于设备维修/操作的技术问题
 
     # 步骤 C：调用大模型并展示思考过程
     with st.chat_message("assistant"):
-        # 体现出你的系统在干两件事
-        with st.spinner('🔍 正在进行向量粗筛与 Rerank 深度重排，请稍候...'):
+        # 修改加载动画的提示语
+        with st.spinner('🔍 正在进行 BM25+向量 双路召回 与 BGE 深度重排，请稍候...'):
             try:
                 response = qa_chain.invoke({
                     "input": prompt,
@@ -84,7 +88,8 @@ if prompt := st.chat_input("请输入您关于设备维修/操作的技术问题
                 source_docs = response.get("context", [])
                 
                 if source_docs:
-                    with st.expander("📚 查看参考来源 (Top-3 重排结果)"):
+                    # 修改折叠面板标题
+                    with st.expander("📚 查看参考来源 (双路召回 + Top-3 精排结果)"):
                         for i, doc in enumerate(source_docs):
                             source_name = doc.metadata.get("source", "未知文档")
                             page_num = doc.metadata.get("page", "未知页")
@@ -97,8 +102,6 @@ if prompt := st.chat_input("请输入您关于设备维修/操作的技术问题
                             st.markdown(f"**📄 来源 {i+1}** [⭐BGE得分: `{score}`]: `{source_name}` (第 {page_num} 页)")
                             st.caption(f"{doc.page_content[:150]}...")
 
-
-                
                 # 将回答和来源一并存入 UI 记忆中
                 st.session_state.messages.append({
                     "role": "assistant", 
